@@ -1,0 +1,19 @@
+dag:
+  dag_id: "s3_to_snowflake_dataset1"
+  schedule_interval: "@daily"
+  default_args:
+    owner: "airflow"
+    retries: 1
+    start_date: "2024-03-13"
+
+tasks:
+  fetch_s3_to_snowflake:
+    operator: "airflow.providers.snowflake.transfers.s3_to_snowflake.S3ToSnowflakeOperator"
+    task_id: "load_s3_to_snowflake"
+    aws_conn_id: "aws_default"
+    snowflake_conn_id: "snowflake_default"
+    stage: "MY_STAGE"
+    file_format: "(TYPE = CSV, SKIP_HEADER = 0)"
+    table: "bronze_flatfile_example"
+    s3_bucket: "my-bucket"
+    s3_key: "data/dataset1.csv"
