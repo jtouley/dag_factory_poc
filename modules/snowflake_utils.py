@@ -3,7 +3,17 @@ import structlog
 
 logger = structlog.get_logger()
 
-def load_s3_to_snowflake(task_id, s3_bucket, s3_key, table_name, stage_name, file_format, aws_conn_id, snowflake_conn_id):
+
+def load_s3_to_snowflake(
+    task_id,
+    s3_bucket,
+    s3_key,
+    table_name,
+    stage_name,
+    file_format,
+    aws_conn_id,
+    snowflake_conn_id,
+):
     """
     Returns an Airflow task using `S3ToSnowflakeOperator`.
     """
@@ -15,5 +25,5 @@ def load_s3_to_snowflake(task_id, s3_bucket, s3_key, table_name, stage_name, fil
         table=table_name,
         s3_bucket=s3_bucket,
         s3_key=s3_key,
-        aws_conn_id=aws_conn_id
+        aws_conn_id=aws_conn_id,
     )

@@ -11,6 +11,7 @@ SERIALIZERS = {
     "excel": lambda df, path: df.to_excel(f"{path}.xlsx", index=False),
 }
 
+
 def process_txt(file_content):
     """
     Processes text file content into a DataFrame.
@@ -20,10 +21,11 @@ def process_txt(file_content):
     for row in lines:
         columns = row.split(",")  # Assuming CSV-like structure
         data.append(columns)
-    
+
     df = pd.DataFrame(data)
     logger.info("TXT file processed", records=len(df))
     return df
+
 
 def process_json(json_content):
     """
@@ -38,6 +40,7 @@ def process_json(json_content):
         logger.error("Failed to process JSON file", error=str(e))
         raise
 
+
 def process_parquet(parquet_path):
     """
     Processes Parquet data into a DataFrame.
@@ -50,6 +53,7 @@ def process_parquet(parquet_path):
         logger.error("Failed to process Parquet file", error=str(e))
         raise
 
+
 def process_excel(file_path):
     """
     Processes Excel files into a DataFrame.
@@ -61,6 +65,7 @@ def process_excel(file_path):
     except Exception as e:
         logger.error("Failed to process Excel file", error=str(e))
         raise
+
 
 def process_file(file_path, file_type):
     """
@@ -78,6 +83,7 @@ def process_file(file_path, file_type):
 
     logger.info("Processing file", file_path=file_path, file_type=file_type)
     return processors[file_type](file_path)
+
 
 def enforce_snowflake_schema(dataframe, schema):
     """
@@ -97,13 +103,25 @@ def enforce_snowflake_schema(dataframe, schema):
 
     # Enforce per-column NOT NULL constraints
     for column, column_info in expected_columns.items():
-        if column_info.get("enforce_not_null", False):  # Default to False if not specified
-            dataframe[column].fillna("", inplace=True)  # Replace NULLs with empty string
+        if column_info.get(
+            "enforce_not_null", False
+        ):  # Default to False if not specified
+            dataframe[column].fillna(
+                "", inplace=True
+            )  # Replace NULLs with empty string
 
     logger.info("Schema alignment completed with per-column NOT NULL enforcement")
     return dataframe
 
-def transform_data(file_path, file_type, schema, output_format="json", output_directory="/tmp/default_output", filename="unknown_file"):
+
+def transform_data(
+    file_path,
+    file_type,
+    schema,
+    output_format="json",
+    output_directory="/tmp/default_output",
+    filename="unknown_file",
+):
     """
     Transforms data while ensuring Snowflake schema compatibility.
     """
@@ -121,5 +139,9 @@ def transform_data(file_path, file_type, schema, output_format="json", output_di
         raise ValueError(f"Unsupported output format: {output_format}")
 
     SERIALIZERS[output_format](dataframe, output_directory)
-    logger.info("Data transformed and serialized", output_format=output_format, output_directory=output_directory)
+    logger.info(
+        "Data transformed and serialized",
+        output_format=output_format,
+        output_directory=output_directory,
+    )
     return f"{output_directory}.{output_format}"
