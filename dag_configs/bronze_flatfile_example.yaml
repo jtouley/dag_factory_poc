@@ -1,19 +1,49 @@
-dag:
-  dag_id: "s3_to_snowflake_dataset1"
-  schedule_interval: "@daily"
+pipeline:
+  pipeline_id: "s3_to_snowflake_vendor_data"
+  schedule_interval: "@hourly"
   default_args:
     owner: "airflow"
-    retries: 1
-    start_date: "2024-03-13"
+    retries: 2
+    start_date: "2024-03-15"
+
+schema:
+  expected_columns:
+    - name: "payload"
+      type: "variant"
+      description: "Full JSON payload"
+      enforce_not_null: true
+    - name: "source_system"
+      type: "string"
+      description: "Source system name"
+      enforce_not_null: true
+    - name: "received_at"
+      type: "timestamp"
+      description: "File processing timestamp"
+      enforce_not_null: false
 
 tasks:
-  fetch_s3_to_snowflake:
+  extract_data:
+    operator: "airflow.operators.python.PythonOperator"
+    task_id: "extract_data"
+    python_callable: "src.s3_utils.fetch_file_from_s3"
+    op_kwargs:
+      s3_bucket: "vendor-bucket"
+      s3_key: "data/vendor_export.json"
+
+  transform_data:
+    operator: "airflow.operators.python.PythonOperator"
+    task_id: "transform_data"
+    python_callable: "src.data_processing.serialize_data"
+    op_kwargs:
+      output_format: "json"
+      output_directory: "/tmp/vendor_data"
+
+  load_data:
     operator: "airflow.providers.snowflake.transfers.s3_to_snowflake.S3ToSnowflakeOperator"
-    task_id: "load_s3_to_snowflake"
+    task_id: "load_data"
     aws_conn_id: "aws_default"
     snowflake_conn_id: "snowflake_default"
     stage: "MY_STAGE"
-    file_format: "(TYPE = CSV, SKIP_HEADER = 0)"
-    table: "bronze_flatfile_example"
-    s3_bucket: "my-bucket"
-    s3_key: "data/dataset1.csv"
+    file_format: "(TYPE = JSON)"
+    table: "vendor_data"
+    schema: "bronze"
