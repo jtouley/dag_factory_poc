@@ -1,0 +1,10 @@
+# Local Development Dependencies
+dag-factory
+pandas
+structlog
+
+# Developer Tooling
+pytest
+black
+flake8
+pre-commit
