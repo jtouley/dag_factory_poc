@@ -1,0 +1,7 @@
+apache-airflow-providers-amazon 
+apache-airflow-providers-snowflake 
+apache-airflow-providers-postgres 
+apache-airflow-providers-redis 
+structlog 
+dag-factory 
+pandas
