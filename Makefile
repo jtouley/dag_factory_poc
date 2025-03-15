@@ -12,18 +12,25 @@ help:
 	@echo ""
 	@echo "Commands:"
 	@echo "  up            - Start Airflow in Docker"
+	@echo "  up-no-cache   - Build with no cache and start Airflow in Docker"
 	@echo "  down          - Stop Airflow & remove containers"
 	@echo "  restart       - Restart Airflow containers"
 	@echo "  logs          - View Airflow logs"
 	@echo "  test          - Run all unit tests"
 	@echo "  lint          - Run pre-commit hooks (black, flake8)"
 	@echo "  env           - Generate .env file if missing"
-	@echo "  destroy       - Stop and remove everything (volumes & metadata lost)"
 	@echo "  init-db       - Initialize Airflow database"
 	@echo "  create-admin  - Create an Airflow admin user"
+	@echo "  health-check  - Run health checks on key services"
+	@echo "  destroy       - Stop and remove everything (volumes & metadata lost)"
 
-# 🟢 Start Airflow in Docker
+# 🟢 Start Airflow in Docker (using cached builds)
 up: env
+	$(DOCKER_COMPOSE) up -d
+
+# 🟢 Start Airflow in Docker (force rebuild with no cache)
+up-no-cache: env
+	$(DOCKER_COMPOSE) build --no-cache
 	$(DOCKER_COMPOSE) up -d
 
 # 🔴 Stop Airflow
@@ -77,6 +84,15 @@ create-admin:
 		--lastname User \
 		--role Admin \
 		--email admin@example.com
+
+# 🔍 Health-check: Check MinIO, Postgres, and Redis health
+health-check:
+	@echo "Checking MinIO Health:"
+	@$(DOCKER_COMPOSE) exec minio curl -f http://localhost:9000/minio/health/live && echo "MinIO is healthy" || echo "MinIO health check failed"
+	@echo "Checking Postgres (pg_isready):"
+	@$(DOCKER_COMPOSE) exec postgres pg_isready && echo "Postgres is healthy" || echo "Postgres health check failed"
+	@echo "Checking Redis (redis-cli ping):"
+	@$(DOCKER_COMPOSE) exec redis redis-cli ping && echo "Redis is healthy" || echo "Redis health check failed"
 
 # 💥 Destroy all containers & volumes (use carefully)
 destroy:

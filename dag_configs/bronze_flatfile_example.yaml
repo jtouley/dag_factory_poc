@@ -1,49 +1,71 @@
-pipeline:
-  pipeline_id: "s3_to_snowflake_vendor_data"
-  schedule_interval: "@hourly"
-  default_args:
-    owner: "airflow"
-    retries: 2
-    start_date: "2024-03-15"
+# This YAML file configures an Airflow DAG to load vendor data from S3/MinIO to Snowflake
+# Following the dag-factory format: https://github.com/ajbosco/dag-factory
 
-schema:
-  expected_columns:
-    - name: "payload"
-      type: "variant"
-      description: "Full JSON payload"
-      enforce_not_null: true
-    - name: "source_system"
-      type: "string"
-      description: "Source system name"
-      enforce_not_null: true
-    - name: "received_at"
-      type: "timestamp"
-      description: "File processing timestamp"
-      enforce_not_null: false
+# DAG definition
+default_args:
+  owner: "airflow"
+  retries: 2
+  retry_delay_min: 5
+  start_date: 2024-03-15
+schedule_interval: "@hourly"
+description: "Ingests vendor data from S3/MinIO to Snowflake"
+concurrency: 5
+max_active_runs: 1
+dagrun_timeout_sec: 3600
+default_view: "grid"
+orientation: "TB"
+tags:
+  - "s3"
+  - "snowflake"
+  - "vendor_data"
 
+# Tasks
 tasks:
-  extract_data:
-    operator: "airflow.operators.python.PythonOperator"
-    task_id: "extract_data"
-    python_callable: "src.s3_utils.fetch_file_from_s3"
+  extract_from_s3:
+    operator: PythonOperator
+    python_callable_name: fetch_file_from_s3
+    python_callable_file: /opt/airflow/modules/s3_utils.py
     op_kwargs:
-      s3_bucket: "vendor-bucket"
-      s3_key: "data/vendor_export.json"
+      bucket_name: "bronze"
+      file_key: "vendor_data/vendor_export.json"
+      aws_conn_id: "aws_default"
+    doc_md: |
+      ### Extract Task
+      Fetches JSON file from the bronze bucket in MinIO/S3.
 
   transform_data:
-    operator: "airflow.operators.python.PythonOperator"
-    task_id: "transform_data"
-    python_callable: "src.data_processing.serialize_data"
+    operator: PythonOperator
+    python_callable_name: transform_data
+    python_callable_file: /opt/airflow/modules/data_processing.py
     op_kwargs:
+      file_path: "{{ task_instance.xcom_pull(task_ids='extract_from_s3') }}"
+      file_type: "json"
+      schema: {
+        "expected_columns": [
+          {"name": "payload", "type": "variant", "enforce_not_null": true},
+          {"name": "source_system", "type": "string", "enforce_not_null": true},
+          {"name": "received_at", "type": "timestamp", "enforce_not_null": false}
+        ]
+      }
       output_format: "json"
       output_directory: "/tmp/vendor_data"
+      filename: "vendor_export"
+    dependencies: [extract_from_s3]
+    doc_md: |
+      ### Transform Task
+      Processes vendor data, enforces schema, and prepares for Snowflake loading.
 
-  load_data:
-    operator: "airflow.providers.snowflake.transfers.s3_to_snowflake.S3ToSnowflakeOperator"
-    task_id: "load_data"
+  load_to_snowflake:
+    operator: custom.snowflake_utils.load_s3_to_snowflake
+    task_id: load_to_snowflake
+    s3_bucket: "silver"
+    s3_key: "{{ task_instance.xcom_pull(task_ids='transform_data') }}"
+    table_name: "VENDOR_DATA"
+    stage_name: "S3_STAGE"
+    file_format: "JSON_FORMAT"
     aws_conn_id: "aws_default"
     snowflake_conn_id: "snowflake_default"
-    stage: "MY_STAGE"
-    file_format: "(TYPE = JSON)"
-    table: "vendor_data"
-    schema: "bronze"
+    dependencies: [transform_data]
+    doc_md: |
+      ### Load Task
+      Loads transformed data into Snowflake using the S3ToSnowflakeOperator.
